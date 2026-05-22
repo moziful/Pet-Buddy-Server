@@ -28,6 +28,7 @@ const run = async () => {
 
         const database = client.db("PetBuddyServer");
         const allPetsCollection = database.collection("AllPets");
+        const requestsCollection = database.collection("AdoptionRequests");
 
         app.get('/all-pets', async (req, res) => {
             const cursor = allPetsCollection.find();
@@ -63,6 +64,46 @@ const run = async () => {
             }
         });
 
+        app.get("/adoption-requests", async (req, res) => {
+            const email = req.query.email;
+
+            const result = await requestsCollection
+                .find({ requesterEmail: email })
+                .toArray();
+
+            res.send(result);
+        });
+
+        app.post("/adoption-requests", async (req, res) => {
+            try {
+                const requestData = req.body;
+
+                const existingRequest = await requestsCollection.findOne({
+                    petId: requestData.petId,
+                    requesterEmail: requestData.requesterEmail,
+                });
+
+                if (existingRequest) {
+                    return res.status(409).send({
+                        error: "You have already requested adoption for this pet.",
+                    });
+                }
+                const doc = {
+                    ...requestData,
+                    status: "pending",
+                    requestedAt: new Date(),
+                    updatedAt: new Date(),
+                };
+                const result = await requestsCollection.insertOne(doc);
+                res.send(result);
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({
+                    error: "Failed to create adoption request",
+                });
+            }
+        });
+
 
 
         app.post("/all-pets", async (req, res) => {
@@ -91,7 +132,6 @@ const run = async () => {
 
         const adoptionRequestsCollection = database.collection("AdoptionRequests");
 
-        // CREATE adoption request
         app.post("/adoption-requests", async (req, res) => {
             try {
                 const body = req.body;
@@ -128,6 +168,15 @@ const run = async () => {
                 console.error("ADOPTION ERROR:", error);
                 res.status(500).send({ error: "Failed to create adoption request" });
             }
+        });
+
+
+        app.delete("/adoption-requests/:id", async (req, res) => {
+            const id = req.params.id;
+            const result = await requestsCollection.deleteOne({
+                _id: new ObjectId(id),
+            });
+            res.send(result);
         });
 
 
