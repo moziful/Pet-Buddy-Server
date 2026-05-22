@@ -1,4 +1,5 @@
 const express = require('express');
+const { ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 require('dotenv').config();
@@ -36,6 +37,30 @@ const run = async () => {
         app.get("/featured-pets", async (req, res) => {
             const pets = await allPetsCollection.find().limit(6).toArray();
             res.send(pets);
+        });
+
+        app.get("/all-pets/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                console.log("Received ID:", id);
+
+                if (!ObjectId.isValid(id)) {
+                    return res.status(400).json({ error: "Invalid ID format" });
+                }
+
+                const pet = await allPetsCollection.findOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (!pet) {
+                    return res.status(404).json({ error: "Pet not found" });
+                }
+
+                res.json(pet);
+            } catch (err) {
+                console.error("Error fetching pet:", err);
+                res.status(500).json({ error: "Server error" });
+            }
         });
 
 
