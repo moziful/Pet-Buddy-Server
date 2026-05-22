@@ -28,7 +28,6 @@ const run = async () => {
 
         const database = client.db("PetBuddyServer");
         const allPetsCollection = database.collection("AllPets");
-        const requestsCollection = database.collection("AdoptionRequests");
 
         app.get('/all-pets', async (req, res) => {
             const cursor = allPetsCollection.find();
@@ -65,42 +64,90 @@ const run = async () => {
         });
 
         app.get("/adoption-requests", async (req, res) => {
-            const email = req.query.email;
+            try {
+                const email = req.query.email;
 
-            const result = await requestsCollection
-                .find({ requesterEmail: email })
-                .toArray();
+                const result = await adoptionRequestsCollection
+                    .find({ requesterEmail: email })
+                    .toArray();
 
-            res.send(result);
+                res.json(result);
+            } catch (err) {
+                res.status(500).json({ error: "Failed to get requests" });
+            }
+        });
+
+        app.get("/pets", async (req, res) => {
+            try {
+                const email = req.query.email;
+
+                const query = email ? { ownerEmail: email } : {};
+
+                const pets = await allPetsCollection.find(query).toArray();
+
+                res.json(pets);
+            } catch (error) {
+                res.status(500).json({ error: "Failed to load pets" });
+            }
+        });
+
+        app.get("/adoption-requests/pet/:petId", async (req, res) => {
+            try {
+                const petId = req.params.petId;
+
+                const result = await adoptionRequestsCollection
+                    .find({ petId })
+                    .toArray();
+
+                res.json(result);
+            } catch (err) {
+                res.status(500).json({ error: "Failed to get pet requests" });
+            }
         });
 
         app.post("/adoption-requests", async (req, res) => {
             try {
-                const requestData = req.body;
+                const body = req.body;
 
-                const existingRequest = await requestsCollection.findOne({
-                    petId: requestData.petId,
-                    requesterEmail: requestData.requesterEmail,
+                const existing = await adoptionRequestsCollection.findOne({
+                    petId: body.petId,
+                    requesterEmail: body.requesterEmail,
                 });
 
-                if (existingRequest) {
-                    return res.status(409).send({
+                if (existing) {
+                    return res.status(409).json({
                         error: "You have already requested adoption for this pet.",
                     });
                 }
+
                 const doc = {
-                    ...requestData,
+                    petId: body.petId,
+                    petName: body.petName,
+                    petImage: body.petImage || "",
+
+                    requesterName: body.requesterName,
+                    requesterEmail: body.requesterEmail,
+
+                    ownerEmail: body.ownerEmail || "",
+
+                    message: body.message,
+                    pickupDate: body.pickupDate,
+
                     status: "pending",
                     requestedAt: new Date(),
                     updatedAt: new Date(),
                 };
-                const result = await requestsCollection.insertOne(doc);
-                res.send(result);
+
+                const result = await adoptionRequestsCollection.insertOne(doc);
+
+                res.json({
+                    success: true,
+                    insertedId: result.insertedId,
+                });
+
             } catch (error) {
                 console.error(error);
-                res.status(500).send({
-                    error: "Failed to create adoption request",
-                });
+                res.status(500).json({ error: "Failed to create request" });
             }
         });
 
@@ -170,6 +217,21 @@ const run = async () => {
             }
         });
 
+        app.patch("/all-pets/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const update = req.body;
+
+                const result = await allPetsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: update }
+                );
+
+                res.send(result);
+            } catch (err) {
+                res.status(500).send({ error: "Update failed" });
+            }
+        });
 
         app.delete("/adoption-requests/:id", async (req, res) => {
             const id = req.params.id;
@@ -195,9 +257,6 @@ app.get('/', (req, res) => {
     res.send('Hi, This Message Is From Express Server!');
 });
 
-app.get('/pets', (req, res) => {
-    res.send('Pets route');
-});
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
