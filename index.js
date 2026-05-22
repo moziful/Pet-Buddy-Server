@@ -89,6 +89,46 @@ const run = async () => {
             }
         });
 
+        const adoptionRequestsCollection = database.collection("AdoptionRequests");
+
+        // CREATE adoption request
+        app.post("/adoption-requests", async (req, res) => {
+            try {
+                const body = req.body;
+
+                if (!body.petId || !body.requesterEmail) {
+                    return res.status(400).send({ error: "Missing required fields" });
+                }
+
+                const adoptionRequest = {
+                    petId: body.petId,
+                    petName: body.petName,
+                    petImage: body.petImage || "",
+
+                    requesterName: body.requesterName,
+                    requesterEmail: body.requesterEmail,
+
+                    ownerEmail: body.ownerEmail || "",
+
+                    message: body.message,
+                    pickupDate: body.pickupDate,
+
+                    status: "pending",
+                    requestedAt: new Date(),
+                    updatedAt: new Date(),
+                };
+
+                const result = await adoptionRequestsCollection.insertOne(adoptionRequest);
+
+                res.send({
+                    success: true,
+                    insertedId: result.insertedId,
+                });
+            } catch (error) {
+                console.error("ADOPTION ERROR:", error);
+                res.status(500).send({ error: "Failed to create adoption request" });
+            }
+        });
 
 
         // Send a ping to confirm a successful connection
