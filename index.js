@@ -5,9 +5,12 @@ const port = process.env.PORT || 5000;
 require('dotenv').config();
 cors = require('cors');
 
-app.use(cors());
 app.use(express.json());
 
+app.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+}));
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const uri = process.env.MONGODB_URI;
@@ -28,6 +31,8 @@ const run = async () => {
 
         const database = client.db("PetBuddyServer");
         const allPetsCollection = database.collection("AllPets");
+        const adoptionRequestsCollection = database.collection("AdoptionRequests");
+
 
         app.get('/all-pets', async (req, res) => {
             const cursor = allPetsCollection.find();
@@ -91,7 +96,14 @@ const run = async () => {
             }
         });
 
-        app.get("/adoption-requests/pet/:petId", async (req, res) => {
+        app.get("/adoption-requests/pet/:petId", (req, res, next) => {
+            const header = req.headers.authorization
+            if (header === "logged in") {
+                return next();
+            } else {
+                res.status(401).json({ error: "Unauthorized" });
+            }
+        }, async (req, res) => {
             try {
                 const petId = req.params.petId;
 
@@ -104,53 +116,6 @@ const run = async () => {
                 res.status(500).json({ error: "Failed to get pet requests" });
             }
         });
-
-        app.post("/adoption-requests", async (req, res) => {
-            try {
-                const body = req.body;
-
-                const existing = await adoptionRequestsCollection.findOne({
-                    petId: body.petId,
-                    requesterEmail: body.requesterEmail,
-                });
-
-                if (existing) {
-                    return res.status(409).json({
-                        error: "You have already requested adoption for this pet.",
-                    });
-                }
-
-                const doc = {
-                    petId: body.petId,
-                    petName: body.petName,
-                    petImage: body.petImage || "",
-
-                    requesterName: body.requesterName,
-                    requesterEmail: body.requesterEmail,
-
-                    ownerEmail: body.ownerEmail || "",
-
-                    message: body.message,
-                    pickupDate: body.pickupDate,
-
-                    status: "pending",
-                    requestedAt: new Date(),
-                    updatedAt: new Date(),
-                };
-
-                const result = await adoptionRequestsCollection.insertOne(doc);
-
-                res.json({
-                    success: true,
-                    insertedId: result.insertedId,
-                });
-
-            } catch (error) {
-                console.error(error);
-                res.status(500).json({ error: "Failed to create request" });
-            }
-        });
-
 
 
         app.post("/all-pets", async (req, res) => {
@@ -177,7 +142,6 @@ const run = async () => {
             }
         });
 
-        const adoptionRequestsCollection = database.collection("AdoptionRequests");
 
         app.post("/adoption-requests", async (req, res) => {
             try {
@@ -221,10 +185,13 @@ const run = async () => {
             try {
                 const id = req.params.id;
                 const update = req.body;
+                const { name, fee, image, description } = req.body;
 
                 const result = await allPetsCollection.updateOne(
                     { _id: new ObjectId(id) },
-                    { $set: update }
+                    {
+                        $set: { name, fee, image, description }
+                    }
                 );
 
                 res.send(result);
@@ -233,9 +200,41 @@ const run = async () => {
             }
         });
 
+        app.patch("/adoption-requests/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const { status, petId } = req.body;
+
+                await adoptionRequestsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $set: {
+                            status,
+                            updatedAt: new Date(),
+                        },
+                    }
+                );
+
+                if (status === "approved") {
+                    await allPetsCollection.updateOne(
+                        { _id: new ObjectId(petId) },
+                        { $set: { status: "adopted" } }
+                    );
+                }
+
+                if (status === "rejected") {
+                    // optional: keep available or reset logic
+                }
+
+                res.send({ success: true });
+            } catch (err) {
+                res.status(500).send({ error: "Failed update" });
+            }
+        });
+
         app.delete("/adoption-requests/:id", async (req, res) => {
             const id = req.params.id;
-            const result = await requestsCollection.deleteOne({
+            await adoptionRequestsCollection.deleteOne({
                 _id: new ObjectId(id),
             });
             res.send(result);
