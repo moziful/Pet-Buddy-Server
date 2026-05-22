@@ -9,10 +9,12 @@ const port = process.env.PORT || 5000;
 app.use(express.json());
 
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: [
+        "http://localhost:3000",
+        "https://assignment-09-phi.vercel.app/",
+    ],
     credentials: true,
 }));
-
 const uri = process.env.MONGODB_URI;
 
 const client = new MongoClient(uri, {
@@ -272,3 +274,5 @@ async function startServer() {
 
 // Boot up the server
 startServer();
+
+module.exports = app;
