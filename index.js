@@ -120,6 +120,18 @@ app.post("/adoption-requests", async (req, res, next) => {
         if (!body.petId || !body.requesterEmail) {
             return res.status(400).json({ error: "Missing required fields" });
         }
+        const pet = await allPetsCollection.findOne({
+            _id: new ObjectId(body.petId)
+        });
+        if (!pet) {
+            return res.status(404).json({ error: "Pet not found" });
+        }
+        if (pet.ownerEmail === body.requesterEmail) {
+            return res.status(403).json({ error: "You cannot adopt your own pet" });
+        }
+        if (pet.status === "adopted") {
+            return res.status(400).json({ error: "This pet has already been adopted" });
+        }
         const adoptionRequest = {
             ...body,
             status: "pending",
