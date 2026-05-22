@@ -65,6 +65,32 @@ const run = async () => {
 
 
 
+        app.post("/all-pets", async (req, res) => {
+            try {
+                const pet = req.body;
+                const lastPet = await allPetsCollection
+                    .find()
+                    .sort({ id: -1 })
+                    .limit(1)
+                    .toArray();
+                const nextId = lastPet.length > 0 ? lastPet[0].id + 1 : 1;
+                const newPet = {
+                    ...pet,
+                    id: nextId,
+                };
+                const result = await allPetsCollection.insertOne(newPet);
+                res.send({
+                    success: true,
+                    insertedId: result.insertedId,
+                    id: nextId,
+                });
+            } catch (error) {
+                res.status(500).send({ error: "Failed to insert pet" });
+            }
+        });
+
+
+
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
