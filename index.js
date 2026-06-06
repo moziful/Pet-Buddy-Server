@@ -10,7 +10,8 @@ app.use(express.json());
 app.use(cors({
     origin: [
         "http://localhost:3000",
-        "https://assignment-09-phi.vercel.app"
+        "https://assignment-09-phi.vercel.app",
+        "https://petbuddy-adopt.vercel.app"
     ],
     credentials: true,
 }));
