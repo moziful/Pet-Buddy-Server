@@ -101,8 +101,10 @@ app.get('/all-pets', async (req, res, next) => {
 
         const query = {};
 
-        if (search) {
-            query.name = { $regex: search, $options: 'i' };
+        if (search && search.trim()) {
+            const trimmedSearch = search.trim();
+            const escapedSearch = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            query.name = { $regex: escapedSearch, $options: 'i' };
         }
 
         if (species && species !== 'all') {
@@ -118,9 +120,9 @@ app.get('/all-pets', async (req, res, next) => {
         let pets = await allPetsCollection.find(query).sort(sortCriteria).toArray();
 
         if (sortBy === 'fee-asc') {
-            pets.sort((a, b) => Number(a.fee.replace(/\D/g, "")) - Number(b.fee.replace(/\D/g, "")));
+            pets.sort((a, b) => Number(String(a.fee || '').replace(/\D/g, "")) - Number(String(b.fee || '').replace(/\D/g, "")));
         } else if (sortBy === 'fee-desc') {
-            pets.sort((a, b) => Number(b.fee.replace(/\D/g, "")) - Number(a.fee.replace(/\D/g, "")));
+            pets.sort((a, b) => Number(String(b.fee || '').replace(/\D/g, "")) - Number(String(a.fee || '').replace(/\D/g, "")));
         }
 
         res.json(pets);
